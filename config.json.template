@@ -1,0 +1,61 @@
+{
+    "logging": {
+        "file_logging": true // 是否将日志保存到本地 app.log 文件
+    },
+    "proxy": {
+        "enabled": true, // 是否启用代理（使用 Google 翻译通常需要开启）
+        "http": "http://127.0.0.1:10809", // HTTP 代理地址 (优先级高于 socks5)
+        "https": "http://127.0.0.1:10809", // HTTPS 代理地址 (优先级高于 socks5)
+        "socks5": "127.0.0.1:10808" // SOCKS5 代理地址 (例如: 127.0.0.1:10808)，如果未设置 http/https 则使用此项
+    },
+    "chrome": {
+        "binary_path": "./chrome-win64/chrome-win64/chrome.exe", // Chrome 浏览器可执行文件路径
+        "driver_path": "./chromedriver-win64/chromedriver-win64/chromedriver.exe", // ChromeDriver 路径
+        "use_headless": true // 是否使用无头模式（不显示 Chrome 窗口）
+    },
+    "speech_recognition": {
+        "language": "en-US", // 语音识别语言，例如 "en-US" (英语) 或 "zh-CN" (中文)
+        "watchdog_silence_ms": 3000, // 静默看门狗：超过此时间没有识别结果则尝试重启识别
+        "watchdog_max_duration_ms": 15000 // 强制重启：单次识别最长持续时间，防止 API 挂起
+    },
+    "ui": {
+        "width": 800, // 初始窗口宽度
+        "height": 300, // 初始窗口高度
+        "bg_color": "#000000", // 背景颜色 (十六进制)
+        "bg_alpha": 0.6, // 窗口整体透明度 (0.0 到 1.0)
+        "font_family": "Microsoft YaHei UI", // 字体名称
+        "english": {
+            "font_size": 18, // 英文实时流字体大小
+            "color": "#FF0000" // 英文实时流文字颜色 (红色)
+        },
+        "chinese": {
+            "font_size": 22, // 中文翻译结果字体大小
+            "color": "#FFFFFF" // 中文翻译结果文字颜色
+        },
+        "source": {
+            "font_size": 14, // 翻译配对原文文字大小
+            "color": "#00FF00" // 翻译配对原文文字颜色 (绿色)
+        },
+        "history": {
+            "font_size": 16, // 历史翻译记录字体大小
+            "color": "#BBBBBB", // 历史翻译记录文字颜色
+            "time_font_size": 12, // 历史时间戳字体大小
+            "time_color": "#888888", // 历史时间戳文字颜色 (深灰色)
+            "count": 2 // 显示的历史记录条数
+        },
+        "animation": {
+            "shrink_factor": 0.01, // 收缩动画的阻尼系数 (0.001~1.0)，越小越慢，默认 0.01
+            "shrink_delay": 5.0 // 收缩前的停留时间(秒)，防止频繁跳动
+        },
+        "x": 100, // 初始窗口 X 坐标
+        "y": 100  // 初始窗口 Y 坐标
+    },
+    "translation": {
+        "source_lang": "en", // 翻译源语言，例如 "en" (英语) 或 "zh-CN" (中文)
+        "target_lang": "zh-CN", // 翻译目标语言，例如 "zh-CN" (中文) 或 "en" (英语)
+        "interim_translate_trigger_threshold": 50, // 中间结果触发翻译的最小字符长度
+        "interim_translate_min_threshold": 20, // 配合超时触发翻译的最小字符长度
+        "interim_translate_timeout": 4.0, // 停顿超过此秒数，即使长度没达到 50 也会触发翻译
+        "interim_debounce_interval": 1.0 // 冷却时间：针对长句中间结果，每两次翻译之间的最小间隔秒数
+    }
+}

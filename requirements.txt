@@ -1,0 +1,5 @@
+selenium
+deep-translator
+requests
+websockets
+PySocks

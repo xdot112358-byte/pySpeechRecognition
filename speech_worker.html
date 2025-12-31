@@ -1,0 +1,117 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Speech Recognition Worker</title>
+</head>
+<body>
+        <script>
+            const WATCHDOG_SILENCE_MS = 3000;
+            const WATCHDOG_MAX_MS = 15000;
+            const RECOGNITION_LANG = "en";
+            const WS_URL = "ws://127.0.0.1:8765";
+        </script>
+        
+    <h1>Listening...</h1>
+    <div id="output">Waiting for speech...</div>
+    <div id="status">initializing</div>
+    <script>
+        const outputDiv = document.getElementById('output');
+        const statusDiv = document.getElementById('status');
+        
+        // 配置参数 (由 Python 头部注入)
+        // const WATCHDOG_SILENCE_MS = ...;
+        // const WATCHDOG_MAX_MS = ...;
+        // const WS_URL = ...;
+
+        let ws = null;
+        let recognition = null;
+
+        function connectWebSocket() {
+            ws = new WebSocket(WS_URL);
+            ws.onopen = () => {
+                console.log("WS: Connected");
+                statusDiv.innerText = "ws_connected";
+                startRecognition();
+            };
+            ws.onclose = () => {
+                statusDiv.innerText = "ws_disconnected";
+                setTimeout(connectWebSocket, 2000);
+            };
+        }
+
+        function startRecognition() {
+            if (recognition) return;
+            if (!('webkitSpeechRecognition' in window)) {
+                outputDiv.innerText = "Error: webkitSpeechRecognition not supported.";
+                return;
+            }
+
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = RECOGNITION_LANG;
+
+            let lastResultTime = Date.now();
+            let startTime = Date.now();
+            
+            setInterval(() => {
+                const now = Date.now();
+                const isSilent = (now - lastResultTime > WATCHDOG_SILENCE_MS);
+                const isTooLong = (now - startTime > WATCHDOG_MAX_MS);
+                
+                if (statusDiv.innerText.includes("listening") && (isSilent || isTooLong)) {
+                    console.warn("JS: Watchdog triggered.");
+                    statusDiv.innerText = "watchdog_restart";
+                    recognition.stop(); 
+                }
+            }, 500);
+
+            recognition.onstart = () => {
+                statusDiv.innerText = "listening";
+                lastResultTime = Date.now();
+                startTime = Date.now();
+                console.log("JS: Speech recognition started.");
+            };
+
+            recognition.onerror = (e) => console.error("JS: Error", e.error);
+            recognition.onend = () => {
+                statusDiv.innerText = "stopped";
+                recognition.start();
+            };
+
+            recognition.onresult = (event) => {
+                lastResultTime = Date.now();
+                let combinedInterim = "";
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const transcript = event.results[i][0].transcript;
+                    const isFinal = event.results[i].isFinal;
+                    
+                    if (isFinal) {
+                        // 遇到 Final，立即发送，并清空之前的 Interim 暂存
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({"text": transcript, "is_final": true}));
+                        }
+                        combinedInterim = ""; 
+                        outputDiv.innerText = "FINAL: " + transcript;
+                    } else {
+                        // 累加 Interim
+                        combinedInterim += transcript;
+                    }
+                }
+
+                // 处理循环结束后剩余的 Interim
+                if (combinedInterim.length > 0) {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({"text": combinedInterim, "is_final": false}));
+                    }
+                    outputDiv.innerText = "INTERIM: " + combinedInterim;
+                }
+            };
+            recognition.start();
+        }
+        connectWebSocket();
+    </script>
+</body>
+</html>

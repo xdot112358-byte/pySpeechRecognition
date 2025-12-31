@@ -1,0 +1,61 @@
+{
+    "logging": {
+        "file_logging": true
+    },
+    "proxy": {
+        "enabled": true,
+        "http": "http://127.0.0.1:10809",
+        "https": "http://127.0.0.1:10809",
+        "socks5": "127.0.0.1:10809"
+    },
+    "chrome": {
+        "binary_path": "./chrome-win64/chrome-win64/chrome.exe",
+        "driver_path": "./chromedriver-win64/chromedriver-win64/chromedriver.exe",
+        "use_headless": true
+    },
+    "speech_recognition": {
+        "language": "en",
+        "watchdog_silence_ms": 3000,
+        "watchdog_max_duration_ms": 15000
+    },
+    "ui": {
+        "width": 800,
+        "height": 200,
+        "bg_color": "#000000",
+        "bg_alpha": 0.8,
+        "font_family": "Microsoft YaHei UI",
+        "english": {
+            "font_size": 18,
+            "color": "#FF0000"
+        },
+        "chinese": {
+            "font_size": 22,
+            "color": "#FFFFFF"
+        },
+        "source": {
+            "font_size": 14,
+            "color": "#00FF00"
+        },
+        "history": {
+            "font_size": 16,
+            "color": "#FFFFFF",
+            "time_font_size": 12,
+            "time_color": "#00FF00",
+            "count": 4
+        },
+        "animation": {
+            "shrink_factor": 0.01,
+            "shrink_delay": 5.0
+        },
+        "x": 1173,
+        "y": 403
+    },
+    "translation": {
+        "source_lang": "en",
+        "target_lang": "zh-CN",
+        "interim_translate_trigger_threshold": 50,
+        "interim_translate_min_threshold": 20,
+        "interim_translate_timeout": 4.0,
+        "interim_debounce_interval": 2.0
+    }
+}

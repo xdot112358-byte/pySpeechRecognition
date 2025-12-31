@@ -1,0 +1,14 @@
+# Chrome and Drivers
+chrome-win64/
+chromedriver-win64/
+chrome-headless-shell-win64/
+*.zip
+chrome_data/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Logs
+app.log
+
