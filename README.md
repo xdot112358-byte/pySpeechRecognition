@@ -2,6 +2,10 @@
 
 这是一个基于 **Web Speech API + Google Translate** 开发的实时语音识别与双语翻译字幕工具。它可以捕获系统音频（或麦克风），进行高精度的实时识别，并将其自动翻译为目标语言，以透明浮窗的形式呈现在桌面上。
 
+## 视频演示
+
+[![YouTube 使用演示视频](https://img.youtube.com/vi/Ai0pjcd1PNI/maxresdefault.jpg)](https://www.youtube.com/watch?v=Ai0pjcd1PNI)
+
 ## 核心特性
 
 - **高精度识别**：利用 Chrome 浏览器的 Web Speech API 进行语音识别，支持多种语言。
