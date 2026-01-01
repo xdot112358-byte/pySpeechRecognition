@@ -250,24 +250,38 @@ class OverlayWindow:
     def update_translation(self, zh_text, en_text, is_final=False):
         if self._is_closing: return
         try:
-            # [恢复] 原有的“基于文本突变”逻辑
-            # 原理：当收到新句子且新句子不再是旧句子的延续时，归档旧句子
-            if self.last_zh and not zh_text.startswith("[Err"):
-                is_new_record = self.last_is_final or \
-                            (not zh_text.startswith(self.last_zh[:3]) and len(zh_text) < len(self.last_zh))
+            # [重构] 实时同步历史记录逻辑：原地更新或追加
+            if zh_text and not zh_text.startswith("[Err"):
+                # 1. 清洗文本
+                clean_text = zh_text.split(" (耗时")[0].split(" [Final]")[0].split(" [Len]")[0].split(" [Time]")[0].strip()
                 
-                if is_new_record:
-                    clean_text = self.last_zh.split(" (耗时")[0].split(" [Final]")[0].split(" [Len]")[0].split(" [Time]")[0].strip()
-                    if clean_text:
-                        timestamp = datetime.now().strftime("%H:%M:%S")
+                if clean_text:
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+                    
+                    # 2. 判定是追加还是原地更新
+                    should_append = True
+                    if self.history:
+                        last_record = self.history[-1]
+                        # 如果开头 3 个字符相同，判定为同一句话的更新
+                        if clean_text.startswith(last_record["text"][:3]):
+                            should_append = False
+                            # 原地更新文本和时间戳
+                            last_record["text"] = clean_text
+                            last_record["time"] = timestamp
+                    
+                    if should_append:
+                        # 追加新记录
                         self.history.append({"text": clean_text, "time": timestamp})
                         
+                        # 超过容量则移除最旧的一条 (旧->新 排序)
                         max_count = self.config.get("ui", {}).get("history", {}).get("count", 2)
                         if len(self.history) > max_count:
                             self.history.pop(0)
-                        self._update_history_view()
+                    
+                    # 3. 刷新历史视图
+                    self._update_history_view()
 
-            # 更新 UI 显示
+            # 更新 UI 主窗口当前显示
             self.lbl_chinese.config(text=zh_text)
             self.lbl_source.config(text=en_text)
             
