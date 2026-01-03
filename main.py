@@ -74,7 +74,14 @@ class AppController:
         # 1. 极速启动 UI (显示加载状态)
         logger.info("Starting UI...")
         self.ui = OverlayWindow(self.config, on_close_callback=self.shutdown)
-        self.ui.update_english("Initializing...")
+        
+        # [修改] 必须先初始化队列变量，再调用 update
+        self.status_queue = []
+        self.status_display_job = None
+        self.has_started_recognition = False 
+        
+        # [修改] 统一使用队列更新状态，不再直接调用 update_english
+        self.queue_status_update("Initializing...")
         self.ui.update_chinese("正在加载组件...")
 
         # 2. 异步加载重型服务 (避免阻塞 UI 出现)
@@ -106,10 +113,49 @@ class AppController:
         # /F 强制, /T 包含子进程
         os.system(f"taskkill /F /T /PID {pid}")
 
+    def queue_status_update(self, text):
+        """
+        将状态消息加入播放队列 (线程安全入口)
+        """
+        # [新增] 状态降噪逻辑
+        # 如果已经开始过识别，屏蔽普通的“Listening...”状态，保留上一句英文
+        # 但如果是错误信息 (Error/Busy)，依然强制显示
+        if self.has_started_recognition:
+            is_error = "Error" in text or "Busy" in text
+            if not is_error:
+                return
+
+        self.ui.root.after(0, lambda: self._internal_queue_status(text))
+
+    def _internal_queue_status(self, text):
+        """
+        [主线程] 将消息入队并尝试启动播放器
+        """
+        self.status_queue.append(text)
+        if self.status_display_job is None:
+            self._play_next_status()
+
+    def _play_next_status(self):
+        """
+        [主线程] 播放下一条状态，并停留 800ms
+        """
+        if not self.status_queue:
+            self.status_display_job = None
+            return
+
+        text = self.status_queue.pop(0)
+        self.ui.update_english(text)
+        
+        # 调度下一条 (800ms 后)
+        self.status_display_job = self.ui.root.after(800, self._play_next_status)
+
     def _load_services(self):
         """
         后台加载服务，完成后启动它们
         """
+        # [新增] 线程启动立即反馈
+        self.queue_status_update("Starting Services...")
+        
         logger.info("Loading services in background...")
         try:
             # 延迟导入，减少冷启动时间
@@ -126,8 +172,10 @@ class AppController:
             # 启动翻译工作线程
             threading.Thread(target=self._translation_worker, daemon=True).start()
             
-            # 更新 UI 状态
-            self.ui.root.after(0, lambda: self.ui.update_english("Waiting for speech..."))
+            # 更新 UI 状态 (使用队列)
+            self.queue_status_update("Services Loaded")
+            self.queue_status_update("Waiting for speech...")
+            
             self.ui.root.after(0, lambda: self.ui.update_translation("等待语音输入...", ""))
             
             logger.info("Services loaded and started.")
@@ -135,7 +183,7 @@ class AppController:
         except Exception as e:
             logger.error(f"Failed to load services: {e}", exc_info=True)
             err_msg = str(e)[:50] # 提前转为字符串，避免 lambda 闭包问题
-            self.ui.root.after(0, lambda: self.ui.update_english("Error loading services"))
+            self.queue_status_update("Error loading services")
             self.ui.root.after(0, lambda: self.ui.update_chinese(err_msg))
 
     def on_speech_status_update(self, status):
@@ -156,8 +204,8 @@ class AppController:
         else:
             display_text = f"Status: {status}"
 
-        # 调度 UI 更新
-        self.ui.root.after(0, lambda t=display_text: self.ui.update_english(t))
+        # 使用带缓冲的队列更新
+        self.queue_status_update(display_text)
 
     def _translation_worker(self):
         """
@@ -229,6 +277,15 @@ class AppController:
                 else:
                     logger.info(f"Receive (Interim): {text}")
                     
+                # [新增] 抢占式更新：一旦有语音进来，立即停止状态消息播放
+                if self.status_display_job:
+                    self.ui.root.after_cancel(self.status_display_job)
+                    self.status_display_job = None
+                self.status_queue.clear() # 清空剩余状态
+                
+                # [新增] 标记已开始识别，后续屏蔽普通状态更新
+                self.has_started_recognition = True
+
                 # 1. 立即更新英文 UI
                 self.ui.update_english(text)
                 
