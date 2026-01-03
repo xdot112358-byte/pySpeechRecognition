@@ -119,8 +119,8 @@ class AppController:
             # 初始化翻译服务
             self.translator = DeepTranslatorService(self.config)
             
-            # 初始化语音服务
-            self.speech_service = SpeechService(self.config, self.on_speech_result)
+            # 初始化语音服务 (传入状态回调)
+            self.speech_service = SpeechService(self.config, self.on_speech_result, self.on_speech_status_update)
             self.speech_service.start() # 启动 Chrome
             
             # 启动翻译工作线程
@@ -137,6 +137,27 @@ class AppController:
             err_msg = str(e)[:50] # 提前转为字符串，避免 lambda 闭包问题
             self.ui.root.after(0, lambda: self.ui.update_english("Error loading services"))
             self.ui.root.after(0, lambda: self.ui.update_chinese(err_msg))
+
+    def on_speech_status_update(self, status):
+        """
+        处理语音服务的状态回传 (在非 UI 线程调用，需调度)
+        """
+        logger.info(f"Speech Status: {status}")
+        
+        display_text = ""
+        if status == "listening":
+            display_text = "Listening..."
+        elif status == "ws_connected":
+            display_text = "Browser Connected (Waiting for Mic...)"
+        elif str(status).startswith("Error"):
+            display_text = f"Speech Error: {status}"
+        elif "Busy" in str(status):
+            display_text = f"System Error: {status}"
+        else:
+            display_text = f"Status: {status}"
+
+        # 调度 UI 更新
+        self.ui.root.after(0, lambda t=display_text: self.ui.update_english(t))
 
     def _translation_worker(self):
         """

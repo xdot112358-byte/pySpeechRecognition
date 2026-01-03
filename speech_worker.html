@@ -33,7 +33,13 @@
             ws.onopen = () => {
                 console.log("WS: Connected");
                 statusDiv.innerText = "ws_connected";
+                // [新增] 发送连接状态
+                ws.send(JSON.stringify({"type": "status", "state": "ws_connected"}));
                 startRecognition();
+            };
+            ws.onerror = (e) => {
+                console.error("WS: Error", e);
+                // 这里不需要重连逻辑，因为 onerror 通常后跟 onclose，由 onclose 处理重连
             };
             ws.onclose = () => {
                 statusDiv.innerText = "ws_disconnected";
@@ -45,6 +51,9 @@
             if (recognition) return;
             if (!('webkitSpeechRecognition' in window)) {
                 outputDiv.innerText = "Error: webkitSpeechRecognition not supported.";
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                     ws.send(JSON.stringify({"type": "error", "message": "Browser not supported"}));
+                }
                 return;
             }
 
@@ -73,9 +82,19 @@
                 lastResultTime = Date.now();
                 startTime = Date.now();
                 console.log("JS: Speech recognition started.");
+                // [新增] 发送监听状态
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({"type": "status", "state": "listening"}));
+                }
             };
 
-            recognition.onerror = (e) => console.error("JS: Error", e.error);
+            recognition.onerror = (e) => {
+                console.error("JS: Error", e.error);
+                // [新增] 发送错误状态
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({"type": "error", "message": e.error}));
+                }
+            };
             recognition.onend = () => {
                 statusDiv.innerText = "stopped";
                 recognition.start();

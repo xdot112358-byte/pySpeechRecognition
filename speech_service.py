@@ -48,7 +48,13 @@ HTML_TEMPLATE_BODY = """
             ws.onopen = () => {
                 console.log("WS: Connected");
                 statusDiv.innerText = "ws_connected";
+                // [新增] 发送连接状态
+                ws.send(JSON.stringify({"type": "status", "state": "ws_connected"}));
                 startRecognition();
+            };
+            ws.onerror = (e) => {
+                console.error("WS: Error", e);
+                // 这里不需要重连逻辑，因为 onerror 通常后跟 onclose，由 onclose 处理重连
             };
             ws.onclose = () => {
                 statusDiv.innerText = "ws_disconnected";
@@ -60,6 +66,9 @@ HTML_TEMPLATE_BODY = """
             if (recognition) return;
             if (!('webkitSpeechRecognition' in window)) {
                 outputDiv.innerText = "Error: webkitSpeechRecognition not supported.";
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                     ws.send(JSON.stringify({"type": "error", "message": "Browser not supported"}));
+                }
                 return;
             }
 
@@ -88,9 +97,19 @@ HTML_TEMPLATE_BODY = """
                 lastResultTime = Date.now();
                 startTime = Date.now();
                 console.log("JS: Speech recognition started.");
+                // [新增] 发送监听状态
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({"type": "status", "state": "listening"}));
+                }
             };
 
-            recognition.onerror = (e) => console.error("JS: Error", e.error);
+            recognition.onerror = (e) => {
+                console.error("JS: Error", e.error);
+                // [新增] 发送错误状态
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({"type": "error", "message": e.error}));
+                }
+            };
             recognition.onend = () => {
                 statusDiv.innerText = "stopped";
                 recognition.start();
@@ -133,9 +152,10 @@ HTML_TEMPLATE_BODY = """
 """
 
 class SpeechService:
-    def __init__(self, config: dict, callback):
+    def __init__(self, config: dict, callback, status_callback=None):
         self.config = config
         self.callback = callback
+        self.status_callback = status_callback
         self.driver = None
         self.is_running = False
         self._threads = []
@@ -173,14 +193,33 @@ class SpeechService:
             try:
                 async for message in websocket:
                     data = json.loads(message)
-                    self.callback(data.get("text", ""), data.get("is_final", False))
+                    # [新增] 处理状态回传
+                    if "type" in data:
+                        msg_type = data["type"]
+                        if msg_type == "status" and self.status_callback:
+                            self.status_callback(data["state"])
+                        elif msg_type == "error":
+                            err_msg = data.get("message", "Unknown Error")
+                            logger.error(f"Chrome Speech Error: {err_msg}")
+                            if self.status_callback:
+                                self.status_callback(f"Error: {err_msg}")
+                    else:
+                        # 兼容旧协议：纯文本识别结果
+                        self.callback(data.get("text", ""), data.get("is_final", False))
             except: pass
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         async def main():
-            async with websockets.serve(handler, WS_HOST, WS_PORT):
-                await asyncio.get_running_loop().create_future()
+            try:
+                async with websockets.serve(handler, WS_HOST, WS_PORT):
+                    await asyncio.get_running_loop().create_future()
+            except OSError as e:
+                # [新增] 端口占用捕获
+                logger.error(f"WS Port {WS_PORT} is busy: {e}")
+                if self.status_callback:
+                    self.status_callback(f"Port {WS_PORT} Busy!")
+
         try:
             loop.run_until_complete(main())
         except Exception as e:
