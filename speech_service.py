@@ -237,8 +237,8 @@ class SpeechService:
         sr_lang = sr_cfg.get("language", "en-US")
         config_script = f"""
         <script>
-            const WATCHDOG_SILENCE_MS = {sr_cfg.get("watchdog_silence_ms", 3000)};
-            const WATCHDOG_MAX_MS = {sr_cfg.get("watchdog_max_duration_ms", 15000)};
+            const WATCHDOG_SILENCE_MS = {sr_cfg.get("watchdog_silence_ms", 8000)};
+            const WATCHDOG_MAX_MS = {sr_cfg.get("watchdog_max_duration_ms", 60000)};
             const RECOGNITION_LANG = "{sr_lang}";
             const WS_URL = "ws://{WS_HOST}:{WS_PORT}";
         </script>
@@ -270,6 +270,9 @@ class SpeechService:
         # [隐蔽] 关键：禁用 Blink 引擎的自动化控制特性
         options.add_argument("--disable-blink-features=AutomationControlled")
         
+        # [优化] 禁用 Chrome 内置的音频处理服务，可能有助于提高对微弱人声的捕捉能力
+        options.add_argument("--disable-features=AudioServiceOutOfProcess")
+
         # [隐蔽] 伪装 User-Agent (去除 HeadlessChrome 标识)
         options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         
